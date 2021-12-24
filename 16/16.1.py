@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from sys import version
+
 HEX_VALS = {
     "0": "0000",
     "1": "0001",
@@ -21,27 +23,54 @@ HEX_VALS = {
 
 LITERAL_VALUE_TYPE = 4
 
+version_sum = 0
+cursor = 0
 
 def main():
-    transmission = "D2FE28"
+    with open("input.txt") as infile:
+        transmission = infile.readline().strip()
     transmission_b = htob(transmission)
-    cursor = 0
-    while cursor <= len(transmission_b):
-        version, cursor = get_bin_field(transmission_b, cursor, 3)
-        type_id, cursor = get_bin_field(transmission_b, cursor, 3)
-        if type_id == LITERAL_VALUE_TYPE:
-            literal, cursor = read_literal(transmission_b, cursor)
-            print(literal)
-        else:
-            length_type_id = transmission_b[cursor]
-            cursor += 1
-            if length_type_id == 1:
-                pass #TODO
-            elif length_type_id == 0:
-                pass #TODO
 
-def get_bin_field(bin, cursor, field_length):
-    val_b = bin[cursor:cursor + field_length]
+    while cursor < len(transmission_b):
+        if "1" in transmission_b[cursor:]:
+            read_packets(transmission_b)
+        else:
+            break
+    print(f'version sum: {version_sum}')
+
+def read_packets(str_b):
+    global cursor
+    version, cursor = get_bin_field(str_b, cursor, 3)
+    global version_sum
+    version_sum += version
+    print(f'version: {version}')
+    
+    type_id, cursor = get_bin_field(str_b, cursor, 3)
+    print(f'type_id: {type_id}')
+    if type_id == LITERAL_VALUE_TYPE:
+        literal, cursor = read_literal(str_b, cursor)
+        print(f'\tliteral: {literal}')
+    else:
+        length_type_id = str_b[cursor]
+        print(f'length_type_id: {length_type_id}')
+        cursor += 1
+        if length_type_id == "0":
+            sub_packet_length, cursor = get_bin_field(str_b, cursor, 15)
+            print(f'sub_packet_length: {sub_packet_length}')
+            end = cursor + sub_packet_length 
+            while cursor < end:
+               read_packets(str_b)
+        elif length_type_id == "1":
+            sub_packet_count, cursor = get_bin_field(str_b, cursor, 11)
+            print(f'sub_packet_count: {sub_packet_count}')
+            for p in range(sub_packet_count, 0, -1):
+                read_packets(str_b)
+
+def show(str_b, cursor):
+    print(f'{str_b[:cursor]}|{str_b[cursor:]}')
+
+def get_bin_field(str_b, cursor, field_length):
+    val_b = str_b[cursor:cursor + field_length]
     return int(val_b, 2), cursor + field_length
 
 def read_literal(bin, cursor):
@@ -55,20 +84,9 @@ def read_literal(bin, cursor):
     cursor += 5
     char_count += 5
 
-    # pad char_count + 6 (version, typeid) to a multiple of 4   
-    len_padding = 4 - (char_count + 6) % 4
-    cursor = consume_padding(bin, cursor, len_padding) 
-
     literal_s = "".join(literal_b)
     return int(literal_s, 2), cursor
-
-def consume_padding(bin, cursor, len_padding):
-    if "1" in bin[cursor:cursor + len_padding]:
-        print("Error padding is not all 0")
-    else:
-        return cursor + len_padding
     
-
 def htob(hstr):
     out = []
     for char in hstr:
